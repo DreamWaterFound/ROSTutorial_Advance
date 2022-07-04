@@ -22,20 +22,25 @@
 // ROS
 #include <ros/ros.h>
 // TODO 补充头文件
-
+#include <move_base_msgs/MoveBaseActionGoal.h>
+#include <actionlib_msgs/GoalStatusArray.h>
+#include <move_base_msgs/MoveBaseActionResult.h>
 
 // 节点基类
 #include "ExperNodeBase.hpp"
 
 /* ========================================== 宏定义 =========================================== */
 #define MACRO_GOAL_POSE_TOPIC       "/move_base/goal"       // 发送导航目标点的 topic
-// #define MACRO_RESULT_TOPIC          "___________"        // 获取导航结果的 topic
+#define MACRO_RESULT_TOPIC          "/move_base/result"        // 获取导航结果的 topic
 
 #define CONST_PI                    3.141592654f            // 圆周率
 
 
 /* ========================================== 全局变量 =========================================== */
 bool gbQuit = false;
+bool UpdateGoalFlag; // 能否更新下目标点的标志
+bool ErrorFlag;
+// 静态回调函数可调用全局变量；若执意调用类内变量，则需要设置类内静态变量，并在类外声明。
 
 /* ========================================== 程序正文 =========================================== */
 
@@ -46,7 +51,7 @@ bool gbQuit = false;
  */
 void OnSignalInterrupt(int nSigId)
 {
-    std::coud << "Ctrl+C Pressed, program terminated." << std::endl;
+    std::cout << "Ctrl+C Pressed, program terminated." << std::endl;
     gbQuit = true;
 }
 
@@ -63,10 +68,11 @@ public:
     SeqGoalNode(int nArgc, char** ppcArgv, const char* pcNodeName)
         : ExperNodeBase(nArgc, ppcArgv, pcNodeName)
     {
+        nCnt = 0;
 
         // TODO 完成设置
-        // mPubNextGoal = _____________________________;
-        // mSubNavRes   = _____________________________;
+        mPubNextGoal    = mupNodeHandle->advertise<move_base_msgs::MoveBaseActionGoal>(MACRO_GOAL_POSE_TOPIC, 1);
+        mSubNavRes      = mupNodeHandle->subscribe(MACRO_RESULT_TOPIC, 1, statusCallback);
 
         // 打开文件
         mifsLandMarks.open(ppcArgv[1]);
@@ -107,16 +113,40 @@ public:
         // 读取点个数
         ReadLandMarkNum();
 
+        while(!mPubNextGoal.getNumSubscribers())
+    	{
+		ROS_INFO("Topic still not subscribed");
+        	ros::Duration(0.5).sleep();
+    	}
+
+        ros::Rate loop_rate(1);
+        UpdateGoalFlag = true;
+        ErrorFlag = false;
         // 处理每一个路标点
         for(size_t nId = 0; 
-            nId < mnMaxLandMarkId && ros::ok() && !gbQuit; // && /* YOUR CONDITION */
+            nId < mnMaxLandMarkId && ros::ok() && !gbQuit && !ErrorFlag; 
             ++nId)
         {
-            // TODO 
-            // <YOUR CODE>
+         
+            double x, y, yaw;
+            ReadNextLandMark(x, y, yaw);
+            ROS_INFO("---Current goal pose---");
+            ROS_INFO("dX: %f; dY: %f; dYAW: %f", x, y, yaw);
+            SetCurrGoal(x, y, yaw);
+            mPubNextGoal.publish(mMsgCurrGoal);
+            ROS_INFO("Current goal pose published.");
+            UpdateGoalFlag = false;
 
+            // ros::Duration(1).sleep();
+            
+            while(!UpdateGoalFlag && !ErrorFlag)
+            {
+                ROS_INFO("Wait for the accomplishment of the current goal.");
+                ros::spinOnce();
+                loop_rate.sleep();
+            }
             // 使用这个实现延时2秒
-            // ros::Duration(2).sleep();
+            ros::Duration(2).sleep();
         }
 
         // TODO 
@@ -124,6 +154,28 @@ public:
     }
 
     // TODO 增加你的成员函数
+    static void statusCallback(const move_base_msgs::MoveBaseActionResult::ConstPtr& pMvBsActRst)
+    {
+    	if (pMvBsActRst->status.status == pMvBsActRst->status.ACTIVE) //1
+    	{
+    		ROS_INFO("The goal is currently being processed by the action server...");
+	    }
+	
+    	if (pMvBsActRst->status.status == pMvBsActRst->status.SUCCEEDED) //3
+    	{
+    		ROS_INFO("The goal was accomplished successfully by the action server!");
+    		UpdateGoalFlag = true;
+            ErrorFlag = false;
+	    }
+
+        if (pMvBsActRst->status.status == pMvBsActRst->status.ABORTED) //4
+    	{
+    		ROS_ERROR("The goal is aborted during execution by the action server.");
+            ROS_ERROR("Navigation failed! The program interupts ...");
+            ErrorFlag = true;
+	    }
+    }
+
 
 private:
 
@@ -141,6 +193,7 @@ private:
         auto& msgPt             = mMsgCurrGoal.goal.target_pose.pose.position;
         auto& msgQt             = mMsgCurrGoal.goal.target_pose.pose.orientation;
 
+
         ros::Time timeStamp = ros::Time::now();
 
         // Step 1 初始化消息头
@@ -156,8 +209,16 @@ private:
         msgGoalID.id = ss.str().c_str();
         ROS_INFO_STREAM("Goal Id: " << ss.str());
 
+        nCnt++;
+
         // TODO 设置坐标
         // <YOUR CODE>
+
+        msgPt.x = dX;
+        msgPt.y = dY;
+        msgPt.z = 0.0f;
+        
+        Heading2Quat(dYawDeg, msgQt);
         
     }
 
@@ -210,8 +271,11 @@ private:
     std::ifstream   mifsLandMarks;          ///< 外部路标点文件的输入流对象
     std::string     mstrLandmarksFile;      ///< 外部路标点文件
     size_t          mnMaxLandMarkId;        ///< 外部路标点文件中的总点数
+    
 
     // TODO 补充你自己的成员变量(如果有的话)
+    move_base_msgs::MoveBaseActionGoal    mMsgCurrGoal;
+    int nCnt;
 };
 
 
