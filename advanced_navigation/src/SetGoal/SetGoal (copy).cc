@@ -19,19 +19,16 @@
 // TODO 补充消息头文件
 #include <move_base_msgs/MoveBaseActionGoal.h>
 #include <actionlib_msgs/GoalStatusArray.h>
-#include <move_base_msgs/MoveBaseActionResult.h>
 
 // 节点基类
 #include "ExperNodeBase.hpp"
 
 using namespace std;
 
-bool ErrorFlag; // 导航失败的标志，全局变量
-
 /* ========================================== 宏定义 =========================================== */
 #define MACRO_GOAL_POSE_TOPIC   "/move_base/goal"       // 发送导航目标点的 topic
 // TODO 2.3.2 填写你选择的 topic
-#define MACRO_RESULT_TOPIC      "/move_base/result"             // 获取导航结果的 topic
+#define MACRO_RESULT_TOPIC      "/move_base/status"             // 获取导航结果的 topic
 
 #define CONST_PI                3.141592654f            // 圆周率
 
@@ -50,7 +47,7 @@ public:
     SetGoalNode(int nArgc, char** ppcArgv, const char* pcNodeName)
         : ExperNodeBase(nArgc, ppcArgv, pcNodeName)
     {
-        nCnt = 0;
+
         // TODO 2.3.1 设置发布器
         mPubNextGoal    = mupNodeHandle->advertise<move_base_msgs::MoveBaseActionGoal>(MACRO_GOAL_POSE_TOPIC, 1);
         // TODO 2.3.2 设置导航状态订阅器. 注意回调函数是类的成员函数, 或者是类的静态函数时, 后面应该怎么写; 方式不唯一
@@ -70,7 +67,6 @@ public:
         // 如果需要自己添加类成员变量或成员函数, 请随意添加
         
         UpdateGoalFlag = 1;
-        ErrorFlag = 0;
         double X, Y, YawDeg;
         
         while(!mPubNextGoal.getNumSubscribers())
@@ -79,78 +75,71 @@ public:
         	ros::Duration(0.5).sleep();
     	}
     	
-    	ros:: Rate loop_rate(1);
+    	ros:: Rate loop_rate(2);
     	
-    	while (ros::ok() && !ErrorFlag)
+    	while (ros::ok())
     	{
-	    	if (nCnt == 0)
-                ROS_INFO("Input the first goal pose information: X, Y and YawDeg.");
-            else
-                ROS_INFO("Input the next goal pose information: X, Y and YawDeg.");
- 
-            while(1)
-            {
-                cin>>X>>Y>>YawDeg;
-                if (!cin.fail()) break;
-                else
-                {
-                    ROS_ERROR("Input format error, try again ...");
-                    cin.clear(); //清理错误表示符
-                    cin.sync(); //清理缓冲区内容
-                    cin.ignore(1024, 10);
-                }	
-            }
-        
-            SetCurrGoal(X, Y, YawDeg);    
-            mPubNextGoal.publish(mMsgCurrGoal);
-            ROS_INFO("Goal pose published.");
-            UpdateGoalFlag = 0;
-            nCnt++;
+	    
+	    	if (UpdateGoalFlag)
+	    	{
+	    		ROS_INFO("Input the goal pose information: X, Y and YawDeg.");
 	    	
+	    		while(1)
+	    		{
+		    		cin>>X>>Y>>YawDeg;
+		    		if (!cin.fail()) break;
+		    		else
+		    		{
+		    			ROS_ERROR("Input format error, try again ...");
+		    			cin.clear(); //清理错误表示符
+		    			cin.sync(); //清理缓冲区内容
+		    			cin.ignore(1024, 10);
+				    }	
+			    }
+	    	
+                SetCurrGoal(X, Y, YawDeg);    
+                mPubNextGoal.publish(mMsgCurrGoal);
+                ROS_INFO("Goal pose published.");
+                UpdateGoalFlag = 0;
+	    	}
+	    	else
+	    	{
+	    		ROS_INFO("Waiting for the accomplishment of the current goal.");
+	    	}
 
-            // ros::Duration(1).sleep();
+            ros::Duration(1).sleep();
 
-            while(!UpdateGoalFlag && !ErrorFlag)
+            while(!UpdateGoalFlag)
             {
-                ROS_INFO("Wait for the accomplishment of the current goal.");
                 ros::spinOnce();
                 loop_rate.sleep();
             }
-
-            ros::Duration(1).sleep();
 		
         }  
 
         // TODO 2.3.2 获取导航执行结果, 并显示在屏幕上
-        // The result of navigation is shown by the function statusCallback
+        // <YOUR CODE>
     }
 
     // TODO 2.3.2 导航执行结果的回调函数
-    static void statusCallback(const move_base_msgs::MoveBaseActionResult::ConstPtr& pMvBsActRst)
+    static void statusCallback(const actionlib_msgs::GoalStatusArray::ConstPtr& pGoalStaArr)
     {
-        // uint8_t k = pMvBsActRst->status.status;
-    	if (pMvBsActRst->status.status == pMvBsActRst->status.ACTIVE) //1
+    	if (pGoalStaArr->status_list[0].status == pGoalStaArr->status_list[0].ACTIVE) //1
     	{
     		ROS_INFO("The goal is currently being processed by the action server...");
+            UpdateGoalFlag = 0;
 	    }
 	
-    	else if (pMvBsActRst->status.status == pMvBsActRst->status.SUCCEEDED) //3
+    	if (pGoalStaArr->status_list[0].status == pGoalStaArr->status_list[0].SUCCEEDED) //3
     	{
-    		ROS_INFO("The goal was accomplished successfully by the action server!");
+    		ROS_INFO("The goal was achieved successfully by the action server!");
     		UpdateGoalFlag = 1;
-            ErrorFlag = 0;
 	    }
 
-        else if (pMvBsActRst->status.status == pMvBsActRst->status.ABORTED) //4
+        if (pGoalStaArr->status_list[0].status == pGoalStaArr->status_list[0].ABORTED) //4
     	{
     		ROS_ERROR("The goal is aborted during execution by the action server.");
-            ROS_ERROR("Navigation failed! The program interupts ...");
-            ErrorFlag = 1;
 	    }
-        
-        // else{
-        //     cout<< k << endl;
-        // }
     }
 
     static bool UpdateGoalFlag;
@@ -171,9 +160,8 @@ private:
         auto& msgTargetHeader   = mMsgCurrGoal.goal.target_pose.header;
         auto& msgPt             = mMsgCurrGoal.goal.target_pose.pose.position;
         auto& msgQt             = mMsgCurrGoal.goal.target_pose.pose.orientation;
-        
-        ros::Time timeStamp = ros::Time::now();
-
+        int nCnt = 0;
+	
         // Step 1 初始化消息头
         msgHeader.seq = nCnt;
         msgHeader.stamp = ros::Time::now();
@@ -189,14 +177,12 @@ private:
          *      - 修改坐标多发送几次呢?
          *      - 你发现 rviz 中机器人执行导航的过程的不正常情况了吗?
         */
-        
+        /*
         std::stringstream ss;
         ss << "my_goal_" << nCnt << "_" << timeStamp.sec << "." << timeStamp.nsec;
         msgGoalID.id = ss.str().c_str();
         ROS_DEBUG_STREAM("Goal Id: " << ss.str());
-        ROS_INFO_STREAM("Goal Id: " << ss.str());
-        
-	
+	*/
         // Step 2 设置目标点
         // TODO 2.3.1 设置目标点
         msgPt.x = dX;
@@ -230,11 +216,10 @@ private:
     ros::Subscriber mSubNavRes;             // 导航状态订阅器
     move_base_msgs::MoveBaseActionGoal    mMsgCurrGoal;
     
-    int nCnt;
+    //int nCnt;
     
 };
 
-//类外声明，相当于全局变量，属于Set Goal Node类
 class SetGoalNode;
 bool SetGoalNode::UpdateGoalFlag; // 能否更新下目标点的标志
 
