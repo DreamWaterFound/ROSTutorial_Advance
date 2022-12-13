@@ -2,10 +2,6 @@
 <launch>
 
     <!-- TODO 补全 -->
-    <!-- 
-        <node ___________________ output="screen"
-            ___________________
-        /> 
-    -->
+    <node pkg="advanced_navi" type="sequence_goal" name="sequence_goal1" args="/home/frankxcr/ROSTutorial_ws/src/advanced_navigation/data/landmarks.txt"  output="screen"/> 
 
 </launch> 
