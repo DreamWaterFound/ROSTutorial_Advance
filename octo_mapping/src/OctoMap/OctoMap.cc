@@ -22,6 +22,7 @@
 
 // PCL
 #include <pcl/point_cloud.h>
+#include <sensor_msgs/PointCloud2.h>
 
 // Octomap
 #include <octomap/OcTree.h>
@@ -50,9 +51,9 @@ public:
         // TODO 补充完善从参数服务器获取节点数据的操作, 参数名称为 "/octo_map/resolution", 类型 float, 
         // 获取后保存在成员变量 mfOctoResolution 中, 如果参数服务器中不存在该参数则使用宏 CONST_OCTOMAP_RESOLUTION_DEFAULT 作为默认值
         // YOUR CODE
-
+        mupNodeHandle->param<float>("/octo_map/resolution", mfOctoResolution, CONST_OCTOMAP_RESOLUTION_DEFAULT);
         // TODO 初始化点云订阅器, 订阅 point_cloud_map 节点的全局点云
-        // mSubPCL = _______________;
+        mSubPCL = mupNodeHandle->subscribe<sensor_msgs::PointCloud2>("/point_cloud_map/global_map", 1, boost::bind(&OctoMapNode::GlobalPCMapCallBack, this, _1));
 
         // 八叉树地图发布器
         mPubOctoMap = mupNodeHandle->advertise<octomap_msgs::Octomap>("/octomap", 1);
@@ -76,12 +77,14 @@ public:
      * @brief 全局点云到来时的回调函数
      * @param[in] msgPCL 消息
      */
-    void GlobalPCMapCallBack(const sensor_msgs::PointCloud2 &msgPCL)
+    void GlobalPCMapCallBack(const sensor_msgs::PointCloud2::ConstPtr &msgPCL)
     {
         ROS_DEBUG("Global Map Get!");
 
         // Step 1 点云消息转换成为 PCL 格式
         // TODO 
+        pcl::PointCloud<pcl::PointXYZRGB> cloud;
+        pcl::fromROSMsg(*msgPCL,cloud);
 
         // Step 2 清除八叉树地图
         mupOctTree->clear();
