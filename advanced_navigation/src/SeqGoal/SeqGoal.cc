@@ -22,6 +22,8 @@
 // ROS
 #include <ros/ros.h>
 // TODO 补充头文件
+#include <move_base_msgs/MoveBaseActionGoal.h>
+#include <move_base_msgs/MoveBaseActionResult.h>
 
 
 // 节点基类
@@ -29,13 +31,14 @@
 
 /* ========================================== 宏定义 =========================================== */
 #define MACRO_GOAL_POSE_TOPIC       "/move_base/goal"       // 发送导航目标点的 topic
-// #define MACRO_RESULT_TOPIC          "___________"        // 获取导航结果的 topic
+#define MACRO_RESULT_TOPIC          "/move_base/result"        // 获取导航结果的 topic
 
 #define CONST_PI                    3.141592654f            // 圆周率
 
 
 /* ========================================== 全局变量 =========================================== */
 bool gbQuit = false;
+int status = 0;
 
 /* ========================================== 程序正文 =========================================== */
 
@@ -46,7 +49,7 @@ bool gbQuit = false;
  */
 void OnSignalInterrupt(int nSigId)
 {
-    std::coud << "Ctrl+C Pressed, program terminated." << std::endl;
+    std::cout << "Ctrl+C Pressed, program terminated." << std::endl;
     gbQuit = true;
 }
 
@@ -64,9 +67,12 @@ public:
         : ExperNodeBase(nArgc, ppcArgv, pcNodeName)
     {
 
+	nCnt = 0;
         // TODO 完成设置
-        // mPubNextGoal = _____________________________;
-        // mSubNavRes   = _____________________________;
+        mPubNextGoal = mupNodeHandle->advertise<move_base_msgs::MoveBaseActionGoal>(MACRO_GOAL_POSE_TOPIC, 1);
+        nCnt = 0;
+        mSubNavRes   = mupNodeHandle->subscribe(MACRO_RESULT_TOPIC, 1, resultCallback);
+
 
         // 打开文件
         mifsLandMarks.open(ppcArgv[1]);
@@ -113,17 +119,44 @@ public:
             ++nId)
         {
             // TODO 
-            // <YOUR CODE>
-
+	    ReadNextLandMark(dX, dY, dYaw);
+	    SetCurrGoal(dX,dY,dYaw);
+	    mPubNextGoal.publish(mMsgCurrGoal);
+	    std::cout << "Navigating"  << "\n";
+	    while(ros::ok() && status != 3)
+	    {
+	   	ros::spinOnce();
+	    }
+	    status = 0;
+	    std::cout << "Wait for 2 sec\n" << std::endl;
             // 使用这个实现延时2秒
-            // ros::Duration(2).sleep();
+            ros::Duration(2).sleep();
         }
 
         // TODO 
-        // <YOUR CODE>
+        std::cout << "All landmark(s) has benn reached!\n";
     }
 
     // TODO 增加你的成员函数
+    static void resultCallback(const move_base_msgs::MoveBaseActionResult& msg)
+    {
+        status = msg.status.status;
+        std::cout << "status: "  << status << "\n";
+        if(status == 1)
+        {
+                std::cout << "Navigating..." << std::endl;
+        }
+        else if(status == 4)
+        {
+                std::cout << "Navigation Failed." << std::endl;
+                ros::shutdown();
+        }
+        else if(status == 3)
+        {
+
+                std::cout << "Navigation Success.Continue to Next Goal" << std::endl;
+        }
+    }
 
 private:
 
@@ -144,7 +177,7 @@ private:
         ros::Time timeStamp = ros::Time::now();
 
         // Step 1 初始化消息头
-        msgHeader.seq = nCnt;
+        msgHeader.seq = nCnt++;
         msgHeader.stamp = ros::Time::now();
         msgHeader.frame_id   = "map";
         
@@ -157,8 +190,10 @@ private:
         ROS_INFO_STREAM("Goal Id: " << ss.str());
 
         // TODO 设置坐标
-        // <YOUR CODE>
-        
+        msgPt.x = dX;
+        msgPt.y = dY;
+        Heading2Quat(dYawDeg,msgQt);
+
     }
 
      /**
@@ -212,6 +247,10 @@ private:
     size_t          mnMaxLandMarkId;        ///< 外部路标点文件中的总点数
 
     // TODO 补充你自己的成员变量(如果有的话)
+    int nCnt;
+    move_base_msgs::MoveBaseActionGoal    mMsgCurrGoal;
+    double dX, dY, dYaw;
+
 };
 
 
