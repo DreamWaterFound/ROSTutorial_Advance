@@ -55,7 +55,7 @@ public:
         : ExperNodeBase(nArgc, ppcArgv, pcNodeName)
     {
         // TODO 2.2.1 初始化发布器
-        // mPubInitPose  = mupNodeHandle->advertise<____>(MACRO_INIT_POSE_TOPIC, 1);
+        mPubInitPose  = mupNodeHandle->advertise<geometry_msgs::PoseWithCovarianceStamped>(MACRO_INIT_POSE_TOPIC, 1);
 
         // TODO 2.2.2 初始化服务客户端
         // ___________ = ______________->serviceClient<__________>(MACRO_CLEAR_COST_MAP_SRV);
@@ -117,7 +117,7 @@ public:
             */
             
             // TODO 2.2.1 发布机器人初始位姿
-            // _________.________(_______);
+            mPubInitPose.publish(mMsgInitPos);
             ROS_INFO("Initilize pose OK.");
         }
 
@@ -158,13 +158,12 @@ private:
 
         // Step 2 设置机器人初始位姿
 
-        /* TODO 2.2.1 数格子获得坐标点
-        msgPt.x = ____;
-        msgPt.y = ____;
-        msgPt.z = ____;
+        // TODO 2.2.1 数格子获得坐标点
+        msgPt.x = -3;
+        msgPt.y = 1;
+        msgPt.z = 0;
 
-        Heading2Quat(____, _____);
-        */
+        Heading2Quat(0, msgQt);
 
         /* TODO 2.2.3 利用 Gazebo 得到的位姿数据, 修改时注意将上面 2.2.1 修改的内容注释掉
         msgPt = ___;
