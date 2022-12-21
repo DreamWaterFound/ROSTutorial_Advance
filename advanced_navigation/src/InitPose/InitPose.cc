@@ -84,10 +84,10 @@ public:
 
             // Step 1.2 等待 gazebo 服务准备就绪
             // TODO 2.2.4
-            // while(______)
-            // {
-            //     ros::Duration(0.1).sleep();
-            // }
+            while(!mClientGzbPose.exists())
+            {
+                ros::Duration(0.1).sleep();
+            }
 
             // Step 1.3 调用 Gazebo 服务
             // NOTICE 下面的程序写法不唯一, 实现功能即可
@@ -115,12 +115,12 @@ public:
 
             // Step 2.2 等待 topic 具有订阅者
             // TODO 2.2.4
-            /*
-            while(________)
+            
+            while(!mPubInitPose.getNumSubscribers())
             {
-                <YOUR CODE>
+                ROS_ERROR("No Subscribers. Retry after 1 seconds ...");
+                ros::Duration(1).sleep();
             }
-            */
             
             // TODO 2.2.1 发布机器人初始位姿
             mPubInitPose.publish(mMsgInitPos);
@@ -134,7 +134,11 @@ public:
             
             // Step 3.2 等待服务有效
             // TODO 2.2.4
-            // <YOUR CODE>
+            while(!mClientClrMap.waitForExistence())
+            {
+                ROS_ERROR("Service is not avilable now. Retry after 1 seconds ...");
+                ros::Duration(1).sleep();
+            }
 
             // Step 3.3 清除地图
             // TODO 2.2.2 调用服务
