@@ -22,7 +22,7 @@
 
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 // TODO 2.2.2 补全头文件
-// #include <std_srvs/_____>
+#include <std_srvs/Empty.h>
 // TODO 2.2.3 补全头文件
 // #include <___________________>
 
@@ -58,7 +58,7 @@ public:
         mPubInitPose  = mupNodeHandle->advertise<geometry_msgs::PoseWithCovarianceStamped>(MACRO_INIT_POSE_TOPIC, 1);
 
         // TODO 2.2.2 初始化服务客户端
-        // ___________ = ______________->serviceClient<__________>(MACRO_CLEAR_COST_MAP_SRV);
+        mClientClrMap = mupNodeHandle->serviceClient<std_srvs::Empty>(MACRO_CLEAR_COST_MAP_SRV);
 
         // TODO 2.2.3 gazebo获取机器人位姿的服务客户端
         //  mClientGzbPose = ____________________________________________(MACRO_GAZEBO_MODEL_STATE_SRV);
@@ -132,7 +132,7 @@ public:
 
             // Step 3.3 清除地图
             // TODO 2.2.2 调用服务
-            // while(!______)
+            while(!mClientClrMap.call(mSrvClrMap))
             {
                 ROS_ERROR("Clear costmap failed. Retry after 2 seconds ...");
                 ros::Duration(2).sleep();
@@ -209,7 +209,7 @@ private:
     std_srvs::Empty                           mSrvClrMap;               ///< 清除 Costmap 使用的服务类型
 
     // TODO 2.2.3
-    // _________________________              mSrvGzbModelState;        ///< 得到的 Gzb 中机器人状态的服务类型
+    //______________                          mSrvGzbModelState;        ///< 得到的 Gzb 中机器人状态的服务类型
 };
 
 /**
