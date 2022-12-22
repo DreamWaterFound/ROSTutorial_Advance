@@ -69,8 +69,8 @@ public:
         mImgSubDepth = mupImgTrans->subscribe(MACRO_SRC_DEPTH_IMG_TOPIC,1,
                             boost::bind(&ImageBaseNode::ImageDepthCallback, this, _1));
 
-        // 发布 发现没人订阅所以注释掉了
-        //mImgPubColoredDepth = mupImgTrans->advertise(MACRO_SRC_COLORED_DEPTH_RES_TOPIC, 1);
+        // 发布 
+        mImgPubColoredDepth = mupImgTrans->advertise(MACRO_SRC_COLORED_DEPTH_RES_TOPIC, 1);
 
 
         // 订阅彩色相机内参
@@ -129,9 +129,10 @@ public:
                     mfSCaleFactorInv, mfSCaleFactorInv);
 
         // TODO 3.2.2 彩色图像灰度化并发布图像
-        // cv::cvtColor(_____);
-        // _______;
-
+        cv::cvtColor(mimgScaledLastRGB,mimgScaledLastGRAY,cv::COLOR_BGR2GRAY);
+        sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", mimgScaledLastGRAY).toImageMsg();
+        //mImgPubColoredDepth.publish(msg);
+        
 
         // 显示图像
         cv::imshow("RGB Image", mimgScaledLastRGB);
@@ -166,13 +167,13 @@ public:
         // TODO 3.2.2 调用伪彩色化函数
         // 根据需要自由补充代码
         // 调用如下函数实现深度度向彩色图的转换
-        // ColoredDepth(/*深度图*/______, /*转换后图像, 是彩色图*/___________);
+        ColoredDepth(mimgScaledLastDepth, mimgScaledLastColorDepth);
 
         // TODO 3.2.2 发布图像
         // 消息类型转换
-        // _____ ________ = _____::______(std_msgs::Header(), "bgr8", _______).toImageMsg();
+        sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", mimgScaledLastColorDepth).toImageMsg();
         // 发布消息
-        // _____.publish(_____);
+        mImgPubColoredDepth.publish(msg);
         
         // TODO 3.2.1 显示图像
         cv::imshow("Depth Image", mimgScaledLastDepth);
@@ -268,7 +269,9 @@ private:
     CameraIntrinsic                                  mDepthCameraIntrinsic;     ///< 深度相机内参
 
     cv::Mat                                          mimgScaledLastRGB;         ///< 缩放后的彩色图像
+    cv::Mat                                          mimgScaledLastGRAY;
     cv::Mat                                          mimgScaledLastDepth;       ///< 缩放后的深度图像
+    cv::Mat                                          mimgScaledLastColorDepth;
 
     float                                            mfSCaleFactorInv;          ///< 缩放因子
 
