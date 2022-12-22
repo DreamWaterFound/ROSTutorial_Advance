@@ -98,20 +98,20 @@ public:
             }
            
             // 输出得到的机器人初始位姿
+            SetInitPoseMsg();
             auto& msgPt     = mMsgInitPos.pose.pose.position;
             auto& msgQt     = mMsgInitPos.pose.pose.orientation;
+            ROS_INFO("\n");
             ROS_INFO("Get the initial pose");
-            ROS_INFO("position:");
-            ROS_INFO("x:%f y:%f z:%f",msgPt.x,msgPt.y,msgPt.z);
-            ROS_INFO("orientation:");
-            ROS_INFO("x:%f y:%f z:%f w:%f",msgQt.x,msgQt.y,msgQt.z,msgQt.w);
+            ROS_INFO("position:x:%f y:%f z:%f",msgPt.x,msgPt.y,msgPt.z);
+            ROS_INFO("orientation:x:%f y:%f z:%f w:%f\n",msgQt.x,msgQt.y,msgQt.z,msgQt.w);
         }
         
 
         // Step 2 设置机器人的初始位姿
         {
             // Step 2.1 设置消息
-            SetInitPoseMsg();
+            // SetInitPoseMsg();
 
             // Step 2.2 等待 topic 具有订阅者
             // TODO 2.2.4
