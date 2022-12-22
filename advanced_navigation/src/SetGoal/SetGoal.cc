@@ -67,7 +67,7 @@ public:
         // 如果需要自己添加类成员变量或成员函数, 请随意添加
         //定义
         double dX,dY,dYawDeg;
-        
+
         // 等待发布器有人订阅
         while(!mPubNextGoal.getNumSubscribers())
         {
