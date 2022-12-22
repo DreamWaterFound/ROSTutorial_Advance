@@ -234,8 +234,7 @@ public:
         // 处理静态点云
         CreateLocalPointCloudMap();
 
-        // 如果需要更新全局点云
-        
+        // 如果需要更新全局点云 
         if(NeedUpdateGlobalMap())
         {
             // 那么就更新全局点云
@@ -385,6 +384,7 @@ public:
         else
         {
             // 不满足
+            ROS_DEBUG_STREAM("No Update");
             return false;
         }
     }
@@ -396,6 +396,18 @@ public:
         // TODO 3.3.4 注意相关参数 mfPCLeafSize mnPCMeanK mfPCFilterThres均已提供
         // YOUR CODE
         pcl::PointCloud<pcl::PointXYZRGB>   tmpPCMapFiltered;
+
+        pcl::VoxelGrid<pcl::PointXYZRGB> downsample;
+        downsample.setInputCloud(mLocalPCMap.makeShared());
+        downsample.setLeafSize(mfPCLeafSize,mfPCLeafSize,mfPCLeafSize);
+        downsample.filter(tmpPCMapFiltered);
+
+        pcl::StatisticalOutlierRemoval<pcl::PointXYZRGB> sor;
+        sor.setInputCloud(tmpPCMapFiltered.makeShared());
+        sor.setMeanK(mnPCMeanK);
+        sor.setStddevMulThresh(mfPCFilterThres);
+        sor.filter(tmpPCMapFiltered);
+
         // Step 2 将点云中点的坐标转换到 map 坐标系下, 添加到全局点云中
         for(auto& oldPt: tmpPCMapFiltered)
         {
@@ -417,7 +429,10 @@ public:
 
         // Step 3 对全局点云进行降采样
         // TODO 3.3.4
-       // YOUR CODE
+        // YOUR CODE
+        downsample.setInputCloud(mGlobalPCMap.makeShared());
+        downsample.setLeafSize(mfPCLeafSize,mfPCLeafSize,mfPCLeafSize);
+        downsample.filter(mGlobalPCMap);
 
         // Step 4 发布全局点云地图
         pcl::toROSMsg(mGlobalPCMap, mMsgGlobalPCMap);
