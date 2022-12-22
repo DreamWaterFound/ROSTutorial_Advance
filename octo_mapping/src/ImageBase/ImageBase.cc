@@ -41,6 +41,7 @@
 // 图像缩小倍数的逆
 #define CONST_IMAGE_DEFAULT_SCALE_FACTOR_INV    0.25
 
+#define MACRO_SRC_COLORED_DEPTH_RES_TOPIC       "/camera/image"
 /* ========================================== 程序正文 =========================================== */
 class ImageBaseNode : public ExperNodeBase
 {
@@ -65,10 +66,11 @@ public:
         // mImgSubRGB = mupImgTrans->subscribe(MACRO_SRC_RGB_IMG_TOPIC, 1, this);
 
         // TODO 3.2.1 订阅深度图像
-        // mImgSubDepth = _____;
+        mImgSubDepth = mupImgTrans->subscribe(MACRO_SRC_DEPTH_IMG_TOPIC,1,
+                            boost::bind(&ImageBaseNode::ImageDepthCallback, this, _1));
 
-        // 发布
-        mImgPubColoredDepth = mupImgTrans->advertise(MACRO_SRC_COLORED_DEPTH_RES_TOPIC, 1);
+        // 发布 发现没人订阅所以注释掉了
+        //mImgPubColoredDepth = mupImgTrans->advertise(MACRO_SRC_COLORED_DEPTH_RES_TOPIC, 1);
 
 
         // 订阅彩色相机内参
@@ -98,7 +100,7 @@ public:
     void Run(void) override
     {
         // TODO 3.2.1 
-        // ______;
+        ros::spin();
     }
 
 public:
@@ -149,7 +151,7 @@ public:
         try
         {
             // 这里会自动重载
-            // _____ = cv_bridge::toCvShare(pMsg)->image ; 
+            imgRecv = cv_bridge::toCvShare(pMsg)->image ; 
         }
         catch (cv_bridge::Exception& e)
         {
@@ -157,7 +159,8 @@ public:
         }
 
         // TODO 3.2.1 缩放图像
-        // __________;
+        cv::resize(imgRecv, mimgScaledLastDepth, cv::Size(), 
+                    mfSCaleFactorInv, mfSCaleFactorInv);
 
         
         // TODO 3.2.2 调用伪彩色化函数
@@ -172,8 +175,8 @@ public:
         // _____.publish(_____);
         
         // TODO 3.2.1 显示图像
-        // _______________
-        // ....
+        cv::imshow("Depth Image", mimgScaledLastDepth);
+        cv::waitKey(1);
     }
 
 
@@ -251,12 +254,13 @@ private:
 
     ros::Subscriber                                  mSubRGBCamInfo;            ///< RGB相机参数订阅器
     ros::Subscriber                                  mSubDenizpthCamInfo;       ///< 深度相机参数订阅器
-
+    ros::Subscriber                                  mSubDepthCamInfo;
     // HERE
 
     image_transport::Subscriber                      mImgSubRGB;                ///< 彩色图像订阅器
     // TODO 3.2.1
-    //_______________::__________                    mImgSubDepth;              ///< 深度图像订阅器
+    image_transport::Subscriber                      mImgSubDepth;              ///< 深度图像订阅器
+    image_transport::Publisher                       mImgPubColoredDepth;
     // TODO 3.2.2 添加发布器
     // ... 随意添加
 
