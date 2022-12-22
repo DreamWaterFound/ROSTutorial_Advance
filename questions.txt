@@ -1,0 +1,20 @@
+//为啥这里不能是个const move_base_msgs::MoveBaseActionResult&引用呢，会报错说类型不匹配
+static void status_callback(const move_base_msgs::MoveBaseActionResult goalstate)
+{
+    if(goalstate.status.status==1) ROS_INFO("Navigation is running!");
+    else if(goalstate.status.status==3)
+    {
+        ROS_INFO("Navigation finished: Success!");
+        ros::shutdown();
+    } 
+    else if(goalstate.status.status==4)
+    {
+        ROS_INFO("Navigation finished: Failed!");
+        ros::shutdown();
+    }
+    else
+    {
+        ROS_ERROR("ERROR NUMBER: %d",goalstate.status.status);
+        ros::shutdown();
+    }
+}
