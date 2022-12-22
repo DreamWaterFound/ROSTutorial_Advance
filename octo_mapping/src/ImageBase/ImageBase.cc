@@ -213,6 +213,21 @@ public:
     void DepthCamInfoCallBack(const sensor_msgs::CameraInfo::ConstPtr& pMsg)
     {
         // TODO 3.2.3 补充代码
+        mDepthCameraIntrinsic.fx = pMsg->K[0] * mfSCaleFactorInv;
+        mDepthCameraIntrinsic.fy = pMsg->K[4] * mfSCaleFactorInv;
+
+        mDepthCameraIntrinsic.cx = pMsg->K[2] * mfSCaleFactorInv;
+        mDepthCameraIntrinsic.cy = pMsg->K[5] * mfSCaleFactorInv;
+
+        mDepthCameraIntrinsic.isOK = true;
+
+        ROS_INFO_STREAM("Depth camera intrinsic: fx = " << mDepthCameraIntrinsic.fx <<
+                        ", fy = " << mDepthCameraIntrinsic.fy << 
+                        ", cx = " << mDepthCameraIntrinsic.cx << 
+                        ", cy = " << mDepthCameraIntrinsic.cy);
+
+        // 关闭订阅器
+        mSubDepthCamInfo.shutdown();
     }
 
 private:
