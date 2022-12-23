@@ -17,7 +17,9 @@
 
 #include <ros/ros.h>
 // TODO 补充消息头文件
-// #include <____>
+#include<geometry_msgs/Quaternion.h>
+#include<move_base_msgs/MoveBaseActionGoal.h>
+#include <move_base_msgs/MoveBaseActionResult.h>
 // ...
 
 // 节点基类
@@ -26,7 +28,7 @@
 /* ========================================== 宏定义 =========================================== */
 #define MACRO_GOAL_POSE_TOPIC   "/move_base/goal"       // 发送导航目标点的 topic
 // TODO 2.3.2 填写你选择的 topic
-// #define MACRO_RESULT_TOPIC      "______"             // 获取导航结果的 topic
+#define MACRO_RESULT_TOPIC      "/move_base/result"     // 获取导航结果的 topic
 
 #define CONST_PI                3.141592654f            // 圆周率
 
@@ -47,9 +49,9 @@ public:
     {
 
         // TODO 2.3.1 设置发布器
-        // mPubNextGoal = _______________(MACRO_GOAL_POSE_TOPIC, 1);
+        mPubNextGoal = mupNodeHandle->advertise<move_base_msgs::MoveBaseActionGoal>(MACRO_GOAL_POSE_TOPIC, 1);
         // TODO 2.3.2 设置导航状态订阅器. 注意回调函数是类的成员函数, 或者是类的静态函数时, 后面应该怎么写; 方式不唯一
-        // mSubNavRes   = _______________(MACRO_RESULT_TOPIC, 1, _____________________);
+        mSubNavRes   = mupNodeHandle->subscribe<move_base_msgs::MoveBaseActionResult>(MACRO_RESULT_TOPIC, 1, status_callback);
 
         // 确保初始化完成, 不然可能存在第一条消息发送不出去的情况
         ros::Duration(0.1).sleep();
@@ -63,18 +65,49 @@ public:
     {
         // TODO 2.3.1 发布导航目标点
         // 如果需要自己添加类成员变量或成员函数, 请随意添加
-        // <YOUR CODE>
+        //定义
+        double dX,dY,dYawDeg;
 
+        // 等待发布器有人订阅
+        while(!mPubNextGoal.getNumSubscribers())
+        {
+            ROS_ERROR("No Subscribers. Retry after 1 seconds ...");
+            ros::Duration(1).sleep();
+        }
+
+        //输入目标地
+        ROS_INFO("Waiting for input:dX dY dYawDeg, while robot is on the ground so no need for dZ.");
+        std::cin >> dX >> dY >> dYawDeg;
+        SetCurrGoal(dX,dY,dYawDeg);
+        mPubNextGoal.publish(mMsgCurrGoal);
+        ROS_INFO("Goal published.");
         // TODO 2.3.2 获取导航执行结果, 并显示在屏幕上
-        // <YOUR CODE>
+        //发布导航状态信息，调用回调函数输出结果
+        ROS_INFO("Navigation is running, please wait for result");
+        ros::spin();
     }
 
     // TODO 2.3.2 导航执行结果的回调函数
-    /* _______________
+    //为啥这里不能是个const move_base_msgs::MoveBaseActionResult&引用呢，会报错说类型不匹配
+    static void status_callback(const move_base_msgs::MoveBaseActionResult goalstate)
     {
-       <YOUR CODE>
+       if(goalstate.status.status==1) ROS_INFO("Navigation is running!");
+       else if(goalstate.status.status==3)
+       {
+            ROS_INFO("Navigation finished: Success!");
+            ros::shutdown();
+       } 
+       else if(goalstate.status.status==4)
+       {
+            ROS_INFO("Navigation finished: Failed!");
+            ros::shutdown();
+       }
+       else
+        {
+            ROS_ERROR("ERROR NUMBER: %d",goalstate.status.status);
+            ros::shutdown();
+        }
     }
-    */
 
 private:
 
@@ -93,7 +126,8 @@ private:
         auto& msgQt             = mMsgCurrGoal.goal.target_pose.pose.orientation;
 
         // Step 1 初始化消息头
-        msgHeader.seq = nCnt;
+        //uint32_t nCnt;
+        //msgHeader.seq = nCnt;
         msgHeader.stamp = ros::Time::now();
         msgHeader.frame_id   = "map";
         
@@ -107,14 +141,19 @@ private:
          *      - 修改坐标多发送几次呢?
          *      - 你发现 rviz 中机器人执行导航的过程的不正常情况了吗?
         */
+       /*
         std::stringstream ss;
         ss << "my_goal_" << nCnt << "_" << timeStamp.sec << "." << timeStamp.nsec;
         msgGoalID.id = ss.str().c_str();
         ROS_DEBUG_STREAM("Goal Id: " << ss.str());
+        */
 
         // Step 2 设置目标点
         // TODO 2.3.1 设置目标点
-        // <YOUR CODE>
+        msgPt.x = dX;
+        msgPt.y = dY;
+        msgPt.z = 0;
+        Heading2Quat(dYawDeg,msgQt);
     }
 
     /**
@@ -137,7 +176,7 @@ private:
     // TODO 2.3.2 补全类型
     ros::Publisher  mPubNextGoal;           // 路标点发布器
     ros::Subscriber mSubNavRes;             // 导航状态订阅器
-    // _______________    mMsgCurrGoal;
+    move_base_msgs::MoveBaseActionGoal    mMsgCurrGoal;
     
 };
 

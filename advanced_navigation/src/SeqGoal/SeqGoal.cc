@@ -22,21 +22,22 @@
 // ROS
 #include <ros/ros.h>
 // TODO 补充头文件
-
+#include<move_base_msgs/MoveBaseActionGoal.h>
+#include <move_base_msgs/MoveBaseActionResult.h>
 
 // 节点基类
 #include "ExperNodeBase.hpp"
 
 /* ========================================== 宏定义 =========================================== */
 #define MACRO_GOAL_POSE_TOPIC       "/move_base/goal"       // 发送导航目标点的 topic
-// #define MACRO_RESULT_TOPIC          "___________"        // 获取导航结果的 topic
+#define MACRO_RESULT_TOPIC          "/move_base/result"        // 获取导航结果的 topic
 
 #define CONST_PI                    3.141592654f            // 圆周率
 
 
 /* ========================================== 全局变量 =========================================== */
 bool gbQuit = false;
-
+bool reachflag;
 /* ========================================== 程序正文 =========================================== */
 
 /**
@@ -46,7 +47,7 @@ bool gbQuit = false;
  */
 void OnSignalInterrupt(int nSigId)
 {
-    std::coud << "Ctrl+C Pressed, program terminated." << std::endl;
+    std::cout << "Ctrl+C Pressed, program terminated." << std::endl;
     gbQuit = true;
 }
 
@@ -65,8 +66,8 @@ public:
     {
 
         // TODO 完成设置
-        // mPubNextGoal = _____________________________;
-        // mSubNavRes   = _____________________________;
+        mPubNextGoal = mupNodeHandle->advertise<move_base_msgs::MoveBaseActionGoal>(MACRO_GOAL_POSE_TOPIC, 1);
+        mSubNavRes   = mupNodeHandle->subscribe<move_base_msgs::MoveBaseActionResult>(MACRO_RESULT_TOPIC, 1, status_callback);
 
         // 打开文件
         mifsLandMarks.open(ppcArgv[1]);
@@ -88,7 +89,9 @@ public:
 
     /** @brief 主循环 */
     void Run(void) override
-    {
+    {   
+        double dX,dY,dYawDeg;
+        reachflag = false;
         // Step 1 从外部文件中读取数据
         if(mifsLandMarks.is_open() == false)
         {
@@ -113,18 +116,43 @@ public:
             ++nId)
         {
             // TODO 
-            // <YOUR CODE>
-
+            ReadNextLandMark(dX,dY,dYawDeg);
+            ROS_INFO("Point %zu: x:%f y:%f z:0 YawDeg:%f",(nId+1),dX,dY,dYawDeg);
+            SetCurrGoal(dX,dY,dYawDeg);
+            mPubNextGoal.publish(mMsgCurrGoal);
+            while(!reachflag)
+            {
+                ros::spinOnce();
+            }
             // 使用这个实现延时2秒
-            // ros::Duration(2).sleep();
+            reachflag = false;
+            ros::Duration(2).sleep();
         }
 
         // TODO 
-        // <YOUR CODE>
+        ros::shutdown();
     }
 
     // TODO 增加你的成员函数
-
+    static void status_callback(const move_base_msgs::MoveBaseActionResult goalstate)
+    {
+       if(goalstate.status.status==1) ROS_INFO("Navigation is running!");
+       else if(goalstate.status.status==3)
+       {
+            ROS_INFO("Navigation finished: Success!");
+            reachflag = true;
+       } 
+       else if(goalstate.status.status==4)
+       {
+            ROS_INFO("Navigation finished: Failed!");
+            reachflag = true;
+       }
+       else
+        {
+            ROS_ERROR("ERROR NUMBER: %d",goalstate.status.status);
+            ros::shutdown();
+        }
+    }
 private:
 
     /**
@@ -141,24 +169,27 @@ private:
         auto& msgPt             = mMsgCurrGoal.goal.target_pose.pose.position;
         auto& msgQt             = mMsgCurrGoal.goal.target_pose.pose.orientation;
 
-        ros::Time timeStamp = ros::Time::now();
+        //ros::Time timeStamp = ros::Time::now();
 
         // Step 1 初始化消息头
-        msgHeader.seq = nCnt;
+        //int nCnt=1;
+        //msgHeader.seq = nCnt;
         msgHeader.stamp = ros::Time::now();
         msgHeader.frame_id   = "map";
         
         msgGoalID.stamp = msgHeader.stamp;
         msgTargetHeader = msgHeader;
-
+        /*
         std::stringstream ss;
         ss << "my_goal_" << nCnt << "_" << timeStamp.sec << "." << timeStamp.nsec;
         msgGoalID.id = ss.str().c_str();
         ROS_INFO_STREAM("Goal Id: " << ss.str());
-
+        */
         // TODO 设置坐标
-        // <YOUR CODE>
-        
+        msgPt.x = dX;
+        msgPt.y = dY;
+        msgPt.z = 0;
+        Heading2Quat(dYawDeg,msgQt);
     }
 
      /**
@@ -210,8 +241,8 @@ private:
     std::ifstream   mifsLandMarks;          ///< 外部路标点文件的输入流对象
     std::string     mstrLandmarksFile;      ///< 外部路标点文件
     size_t          mnMaxLandMarkId;        ///< 外部路标点文件中的总点数
-
     // TODO 补充你自己的成员变量(如果有的话)
+    move_base_msgs::MoveBaseActionGoal    mMsgCurrGoal;
 };
 
 
