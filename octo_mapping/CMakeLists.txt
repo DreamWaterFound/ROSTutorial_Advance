@@ -60,5 +60,5 @@ target_link_libraries(image_base ${catkin_LIBRARIES} ${OpenCV_LIBS})
 add_executable(point_cloud_map ${CMAKE_CURRENT_LIST_DIR}/src/PointsCloudMap/PointsCloudMap.cc)
 target_link_libraries(point_cloud_map ${catkin_LIBRARIES} ${OpenCV_LIBS} ${PCL_LIBRARIES})
 
-# add_executable(octo_map ${CMAKE_CURRENT_LIST_DIR}/src/OctoMap/OctoMap.cc)
-# target_link_libraries(octo_map ${catkin_LIBRARIES} ${PCL_LIBRARIES} octomap)
+add_executable(octo_map ${CMAKE_CURRENT_LIST_DIR}/src/OctoMap/OctoMap.cc)
+target_link_libraries(octo_map ${catkin_LIBRARIES} ${PCL_LIBRARIES} octomap)
