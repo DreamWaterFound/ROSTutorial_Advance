@@ -430,9 +430,9 @@ public:
         // Step 3 对全局点云进行降采样
         // TODO 3.3.4
         // YOUR CODE
-        downsample.setInputCloud(mGlobalPCMap.makeShared());
-        downsample.setLeafSize(mfPCLeafSize,mfPCLeafSize,mfPCLeafSize);
-        downsample.filter(mGlobalPCMap);
+        //downsample.setInputCloud(mGlobalPCMap.makeShared());
+        //downsample.setLeafSize(mfPCLeafSize,mfPCLeafSize,mfPCLeafSize);
+        //downsample.filter(mGlobalPCMap);
 
         // Step 4 发布全局点云地图
         pcl::toROSMsg(mGlobalPCMap, mMsgGlobalPCMap);
