@@ -1,11 +1,9 @@
 <?xml version="1.0"?>
 <launch>
 
-    <!-- TODO 补全 -->
-    <!-- 
-        <node ___________________ output="screen"
-            ___________________
-        /> 
-    -->
+
+	<node name = "sequence_goal" pkg = "advanced_navi" type = "sequence_goal" output="screen" args=" $(find advanced_navi)/data/landmarks.txt"/>
+
+    
 
 </launch> 

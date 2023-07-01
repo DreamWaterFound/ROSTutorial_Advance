@@ -53,7 +53,7 @@ public:
 
         // TODO 初始化点云订阅器, 订阅 point_cloud_map 节点的全局点云
         // mSubPCL = _______________;
-
+        mSubPCL = mupNodeHandle->subscribe<sensor_msgs::PointCloud2>("point_cloud_map", 1, boost::bind(&OctoMapNode::GlobalPCMapCallBack, this, _1));
         // 八叉树地图发布器
         mPubOctoMap = mupNodeHandle->advertise<octomap_msgs::Octomap>("/octomap", 1);
 
@@ -82,10 +82,11 @@ public:
 
         // Step 1 点云消息转换成为 PCL 格式
         // TODO 
-
+        pcl::PointCloud<pcl::PointXYZ> cloud;
+        //pcl::toROSMsg(msgPCL,cloud);
+        pcl::fromROSMsg(msgPCL, cloud);
         // Step 2 清除八叉树地图
         mupOctTree->clear();
-
         // Step 3 向八叉树地图中添加点
         for(const auto& pt : cloud)
         {

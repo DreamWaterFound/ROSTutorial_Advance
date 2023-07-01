@@ -1,0 +1,9 @@
+# 提示 git 不要跟踪这两个目录下的内容
+build/
+.vscode/
+# 提示 git 不要跟踪这个文件，在 ROS 工作空间 src 文件夹下这个是个软连接
+CMakeLists.txt
+# 但是上面会一并忽略这两个包下的同名文件，通过下面的方式告知 git 这些还要跟踪
+!advanced_navigation/CMakeLists.txt
+!octo_mapping/CMakeLists.txt
+

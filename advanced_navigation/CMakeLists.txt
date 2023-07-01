@@ -22,7 +22,7 @@ include_directories(
 )
 
 # TODO 进行实验 2.2 时取消注释
-# add_executable(init_pose ${CMAKE_CURRENT_LIST_DIR}/src/InitPose/InitPose.cc)
+# add_executable(init_pose ${CMAKE_CURRENT_LIST_DIR}/src/InitPose/InitPose1.cc)
 # target_link_libraries(init_pose ${catkin_LIBRARIES})
 
 # TODO 进行实验 2.3 时取消注释

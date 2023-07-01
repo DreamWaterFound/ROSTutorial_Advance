@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<launch>
+	<include file="$(find turtlebot3_gazebo)/launch/turtlebot3_house.launch">   	
+  	</include>
+
+	<include file="$(find turtlebot3_slam)/launch/turtlebot3_slam.launch">
+
+    	<arg name="slam_methods" value="karto" />
+  	</include>
+	
+
+</launch> 

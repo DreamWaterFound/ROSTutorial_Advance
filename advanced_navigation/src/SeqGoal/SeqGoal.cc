@@ -22,21 +22,21 @@
 // ROS
 #include <ros/ros.h>
 // TODO 补充头文件
-
-
+#include <move_base_msgs/MoveBaseActionGoal.h>
+#include <move_base_msgs/MoveBaseActionResult.h>
 // 节点基类
 #include "ExperNodeBase.hpp"
 
 /* ========================================== 宏定义 =========================================== */
 #define MACRO_GOAL_POSE_TOPIC       "/move_base/goal"       // 发送导航目标点的 topic
-// #define MACRO_RESULT_TOPIC          "___________"        // 获取导航结果的 topic
+#define MACRO_RESULT_TOPIC          "/move_base/result"        // 获取导航结果的 topic
 
 #define CONST_PI                    3.141592654f            // 圆周率
 
 
 /* ========================================== 全局变量 =========================================== */
 bool gbQuit = false;
-
+int a =0;
 /* ========================================== 程序正文 =========================================== */
 
 /**
@@ -46,7 +46,7 @@ bool gbQuit = false;
  */
 void OnSignalInterrupt(int nSigId)
 {
-    std::coud << "Ctrl+C Pressed, program terminated." << std::endl;
+    std::cout << "Ctrl+C Pressed, program terminated." << std::endl;
     gbQuit = true;
 }
 
@@ -67,7 +67,9 @@ public:
         // TODO 完成设置
         // mPubNextGoal = _____________________________;
         // mSubNavRes   = _____________________________;
-
+        mPubNextGoal = mupNodeHandle->advertise<move_base_msgs::MoveBaseActionGoal>(MACRO_GOAL_POSE_TOPIC, 1);
+        mSubNavRes   = mupNodeHandle->subscribe(MACRO_RESULT_TOPIC, 1, status_callback);
+        nCnt = 0;
         // 打开文件
         mifsLandMarks.open(ppcArgv[1]);
         mstrLandmarksFile = std::string(ppcArgv[1]);
@@ -106,7 +108,7 @@ public:
         }
         // 读取点个数
         ReadLandMarkNum();
-
+     
         // 处理每一个路标点
         for(size_t nId = 0; 
             nId < mnMaxLandMarkId && ros::ok() && !gbQuit; // && /* YOUR CONDITION */
@@ -114,9 +116,17 @@ public:
         {
             // TODO 
             // <YOUR CODE>
-
-            // 使用这个实现延时2秒
-            // ros::Duration(2).sleep();
+            ReadNextLandMark(dX,dY,dYawDeg);
+            ROS_INFO("Point %zu: x:%f y:%f z:0 YawDeg:%f",(nId+1),dX,dY,dYawDeg);
+            SetCurrGoal(dX,dY,dYawDeg);
+            mPubNextGoal.publish(mMsgCurrGoal);
+            while(ros::ok() && a != 3)
+            {
+            ros::spinOnce();
+            }
+            a = 0;
+          
+            ros::Duration(2).sleep();
         }
 
         // TODO 
@@ -124,7 +134,27 @@ public:
     }
 
     // TODO 增加你的成员函数
+    static void status_callback(const move_base_msgs::MoveBaseActionResult msg)
+    {
+        a=msg.status.status;
+        switch (a) 
+        {
+        case 1:
+            ROS_INFO("Navigation is running!");
+            break;
+        case 4:
+            ROS_INFO("Navigation finished: Failed!");
+             ros::shutdown();
+            break;
+        case 3:
+            ROS_INFO("Navigation finished: Success!");
+            break;
+        default:
+            ROS_ERROR("ERROR NUMBER: %d",msg.status.status);
+            break;
+        }
 
+    }
 private:
 
     /**
@@ -144,6 +174,7 @@ private:
         ros::Time timeStamp = ros::Time::now();
 
         // Step 1 初始化消息头
+        int nCnt=1;
         msgHeader.seq = nCnt;
         msgHeader.stamp = ros::Time::now();
         msgHeader.frame_id   = "map";
@@ -158,6 +189,10 @@ private:
 
         // TODO 设置坐标
         // <YOUR CODE>
+        msgPt.x = dX;
+        msgPt.y = dY;
+        msgPt.z = 0;
+        Heading2Quat(dYawDeg,msgQt);
         
     }
 
@@ -212,6 +247,10 @@ private:
     size_t          mnMaxLandMarkId;        ///< 外部路标点文件中的总点数
 
     // TODO 补充你自己的成员变量(如果有的话)
+    move_base_msgs::MoveBaseActionGoal    mMsgCurrGoal;
+    double dX, dY, dYawDeg;
+    int nCnt ;
+
 };
 
 
