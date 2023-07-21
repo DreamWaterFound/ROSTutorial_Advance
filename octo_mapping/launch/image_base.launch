@@ -2,11 +2,8 @@
 <launch>
 
   <!-- TODO 3.2.4 编写 launch 文件 -->
-
-  <!-- 
-    <node ________________________ output="screen">
-    _________________________ 设置参数服务器参数
+  <node pkg="octo_mapping" type="image_base" name="image_base" output="screen">
+         <param name="/scale_factor_inv"     type="double"     value="0.2"/>
     </node>
-   -->
 
 </launch>
