@@ -150,7 +150,7 @@ public:
         {
             cv::imshow("Output", RGB_GreyImg);
         }
-        
+
         cv::waitKey(5);
 
     }
@@ -228,7 +228,7 @@ public:
      */
     void DepthCamInfoCallBack(const sensor_msgs::CameraInfo::ConstPtr& pMsg)
     {
-        // TODO 3.2.3 补充代码
+        // TODO 3.2.3
         mDepthCameraIntrinsic.fx = pMsg->K[0] * mfSCaleFactorInv;
         mDepthCameraIntrinsic.fy = pMsg->K[4] * mfSCaleFactorInv;
 
