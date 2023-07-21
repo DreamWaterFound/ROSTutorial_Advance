@@ -1,11 +1,10 @@
 <?xml version="1.0"?>
 <launch>
 
-    <!-- TODO 补全 -->
-    <!-- 
-        <node ___________________ output="screen"
-            ___________________
-        /> 
-    -->
+    <!-- Arguments -->
+  <arg name="data_file" default="/home/dyc/ROSTutorial_ws/src/advanced_navigation/data/landmarks.txt "/>
+
+  <!-- sequence_goal -->
+  <node pkg="advanced_navi" name="sequence_goal" type="sequence_goal" args="$(arg data_file)" output="screen"/>
 
 </launch> 

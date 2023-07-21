@@ -38,6 +38,10 @@
 #define MACRO_SRC_RGB_IMG_INFO_TOPIC            "/camera/rgb/camera_info"
 #define MACRO_SRC_DEPTH_IMG_INFO_TOPIC          "/camera/depth/camera_info"
 
+//
+#define MACRO_SRC_COLORED_DEPTH_RES_TOPIC       "/image_converter/colored_depth"
+#define MACRO_SRC_RGB_GREY_RES_TOPIC            "/image_converter/RGB_grey"
+
 // 图像缩小倍数的逆
 #define CONST_IMAGE_DEFAULT_SCALE_FACTOR_INV    0.25
 
@@ -60,16 +64,17 @@ public:
         // 订阅彩色图像, 队列长度最好为1 
         mImgSubRGB = mupImgTrans->subscribe(MACRO_SRC_RGB_IMG_TOPIC, 1, 
                             boost::bind(&ImageBaseNode::ImageRGBCallback, this, _1));
-
         // 这种写法也是可以的, 注意设置类的成员函数作为回调函数时, 需要传递 this 指针
         // mImgSubRGB = mupImgTrans->subscribe(MACRO_SRC_RGB_IMG_TOPIC, 1, this);
 
         // TODO 3.2.1 订阅深度图像
-        // mImgSubDepth = _____;
+        mImgSubDepth = mupImgTrans->subscribe(MACRO_SRC_DEPTH_IMG_TOPIC, 1, 
+                            boost::bind(&ImageBaseNode::ImageDepthCallback, this, _1));
 
-        // 发布
+        // 彩色灰度化图像发布器
+        mImgPubRGBGrey = mupImgTrans->advertise(MACRO_SRC_RGB_GREY_RES_TOPIC , 1);
+        // 伪彩色化深度图像发布器
         mImgPubColoredDepth = mupImgTrans->advertise(MACRO_SRC_COLORED_DEPTH_RES_TOPIC, 1);
-
 
         // 订阅彩色相机内参
         mSubRGBCamInfo = mupNodeHandle->subscribe<sensor_msgs::CameraInfo>(MACRO_SRC_RGB_IMG_INFO_TOPIC, 1, 
@@ -98,7 +103,7 @@ public:
     void Run(void) override
     {
         // TODO 3.2.1 
-        // ______;
+        ros::spin();
     }
 
 public:
@@ -127,14 +132,27 @@ public:
                     mfSCaleFactorInv, mfSCaleFactorInv);
 
         // TODO 3.2.2 彩色图像灰度化并发布图像
-        // cv::cvtColor(_____);
-        // _______;
+        cv::Mat RGB_GreyImg;
+        cv::cvtColor(mimgScaledLastRGB, RGB_GreyImg, CV_RGB2GRAY);
 
+        // 消息类型转换
+        sensor_msgs::ImagePtr processed_RGB_img = cv_bridge::CvImage(std_msgs::Header(), "mono8", RGB_GreyImg).toImageMsg();
+        // 发布消息
+        mImgPubRGBGrey.publish(processed_RGB_img);
 
-        // 显示图像
-        cv::imshow("RGB Image", mimgScaledLastRGB);
-        // 注意必须调用它,否则显示图像的 OpenCV 窗口不会刷新
-        cv::waitKey(1);
+        //OpenCV显示图像
+        if(!mimgScaledLastRGB.empty())
+        {
+            cv::imshow("Input", mimgScaledLastRGB);
+        }
+
+        if(!RGB_GreyImg.empty())
+        {
+            cv::imshow("Output", RGB_GreyImg);
+        }
+        
+        cv::waitKey(5);
+
     }
 
 
@@ -149,7 +167,7 @@ public:
         try
         {
             // 这里会自动重载
-            // _____ = cv_bridge::toCvShare(pMsg)->image ; 
+            imgRecv= cv_bridge::toCvShare(pMsg)->image ; 
         }
         catch (cv_bridge::Exception& e)
         {
@@ -157,23 +175,25 @@ public:
         }
 
         // TODO 3.2.1 缩放图像
-        // __________;
-
+        cv::resize(imgRecv, mimgScaledLastDepth, cv::Size(), 
+                    mfSCaleFactorInv, mfSCaleFactorInv);
         
         // TODO 3.2.2 调用伪彩色化函数
         // 根据需要自由补充代码
-        // 调用如下函数实现深度度向彩色图的转换
-        // ColoredDepth(/*深度图*/______, /*转换后图像, 是彩色图*/___________);
+        // 调用如下函数实现深度图向彩色图的转换
+        cv::Mat Colored_Depth_Img;
+        ColoredDepth(mimgScaledLastDepth, Colored_Depth_Img);
 
         // TODO 3.2.2 发布图像
         // 消息类型转换
-        // _____ ________ = _____::______(std_msgs::Header(), "bgr8", _______).toImageMsg();
+
+        sensor_msgs::ImagePtr processed_Depth_img = cv_bridge::CvImage(std_msgs::Header(), "bgr8", Colored_Depth_Img).toImageMsg();
         // 发布消息
-        // _____.publish(_____);
+        mImgPubColoredDepth.publish(processed_Depth_img);
         
         // TODO 3.2.1 显示图像
-        // _______________
-        // ....
+        cv::imshow("Depth Image", mimgScaledLastDepth);
+        cv::waitKey(1);
     }
 
 
@@ -209,6 +229,21 @@ public:
     void DepthCamInfoCallBack(const sensor_msgs::CameraInfo::ConstPtr& pMsg)
     {
         // TODO 3.2.3 补充代码
+        mDepthCameraIntrinsic.fx = pMsg->K[0] * mfSCaleFactorInv;
+        mDepthCameraIntrinsic.fy = pMsg->K[4] * mfSCaleFactorInv;
+
+        mDepthCameraIntrinsic.cx = pMsg->K[2] * mfSCaleFactorInv;
+        mDepthCameraIntrinsic.cy = pMsg->K[5] * mfSCaleFactorInv;
+
+        mDepthCameraIntrinsic.isOK = true;
+
+        ROS_INFO_STREAM("Depth camera intrinsic: fx = " << mDepthCameraIntrinsic.fx <<
+                        ", fy = " << mDepthCameraIntrinsic.fy << 
+                        ", cx = " << mDepthCameraIntrinsic.cx << 
+                        ", cy = " << mDepthCameraIntrinsic.cy);
+
+        // 关闭订阅器
+        mSubDepthCamInfo.shutdown();
     }
 
 private:
@@ -250,15 +285,16 @@ private:
     std::unique_ptr<image_transport::ImageTransport> mupImgTrans;               ///< ImageTransport 对象指针
 
     ros::Subscriber                                  mSubRGBCamInfo;            ///< RGB相机参数订阅器
-    ros::Subscriber                                  mSubDenizpthCamInfo;       ///< 深度相机参数订阅器
+    ros::Subscriber                                  mSubDepthCamInfo;          ///< 深度相机参数订阅器
 
     // HERE
-
-    image_transport::Subscriber                      mImgSubRGB;                ///< 彩色图像订阅器
     // TODO 3.2.1
-    //_______________::__________                    mImgSubDepth;              ///< 深度图像订阅器
+    image_transport::Subscriber                      mImgSubRGB;                ///< 彩色图像订阅器
+    image_transport::Subscriber                      mImgSubDepth;              ///< 深度图像订阅器
     // TODO 3.2.2 添加发布器
-    // ... 随意添加
+    image_transport::Publisher                       mImgPubRGBGrey;            //彩色灰度化图像发布器
+    image_transport::Publisher                       mImgPubColoredDepth;       //伪彩色化深度图像发布器
+    
 
     CameraIntrinsic                                  mRGBCameraIntrinsic;       ///< 彩色相机内参
     CameraIntrinsic                                  mDepthCameraIntrinsic;     ///< 深度相机内参

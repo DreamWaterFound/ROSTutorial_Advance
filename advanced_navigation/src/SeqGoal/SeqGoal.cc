@@ -21,7 +21,10 @@
 
 // ROS
 #include <ros/ros.h>
-// TODO 补充头文件
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
+#include <move_base_msgs/MoveBaseActionGoal.h>
+#include <move_base_msgs/MoveBaseAction.h>
+#include <move_base_msgs/MoveBaseGoal.h>
 
 
 // 节点基类
@@ -29,13 +32,15 @@
 
 /* ========================================== 宏定义 =========================================== */
 #define MACRO_GOAL_POSE_TOPIC       "/move_base/goal"       // 发送导航目标点的 topic
-// #define MACRO_RESULT_TOPIC          "___________"        // 获取导航结果的 topic
+#define MACRO_RESULT_TOPIC          "/move_base/result"        // 获取导航结果的 topic
 
 #define CONST_PI                    3.141592654f            // 圆周率
-
+using namespace std;
 
 /* ========================================== 全局变量 =========================================== */
 bool gbQuit = false;
+int listen_count=0;
+int listen_goal=0;
 
 /* ========================================== 程序正文 =========================================== */
 
@@ -46,11 +51,11 @@ bool gbQuit = false;
  */
 void OnSignalInterrupt(int nSigId)
 {
-    std::coud << "Ctrl+C Pressed, program terminated." << std::endl;
+    std::cout << "Ctrl+C Pressed, program terminated." << std::endl;
     gbQuit = true;
 }
 
-/** @brief 设置机器人导航路标点序列的节点 */
+/** @brief 设置机器人导航路标点序列 */
 class SeqGoalNode : public ExperNodeBase
 {
 public:
@@ -64,10 +69,11 @@ public:
         : ExperNodeBase(nArgc, ppcArgv, pcNodeName)
     {
 
-        // TODO 完成设置
-        // mPubNextGoal = _____________________________;
-        // mSubNavRes   = _____________________________;
-
+        // TODO
+        //设置发布器
+        mPubNextGoal = mupNodeHandle->advertise<move_base_msgs::MoveBaseActionGoal>(MACRO_GOAL_POSE_TOPIC, 1);
+        mSubNavRes = mupNodeHandle->subscribe<move_base_msgs::MoveBaseActionResult>(MACRO_RESULT_TOPIC, 10, status_callback);
+        
         // 打开文件
         mifsLandMarks.open(ppcArgv[1]);
         mstrLandmarksFile = std::string(ppcArgv[1]);
@@ -89,6 +95,11 @@ public:
     /** @brief 主循环 */
     void Run(void) override
     {
+
+        double dX=0;
+        double dY=0;
+        double dYawDeg=0;
+        
         // Step 1 从外部文件中读取数据
         if(mifsLandMarks.is_open() == false)
         {
@@ -98,7 +109,7 @@ public:
         else
         {
             ROS_INFO_STREAM("Landmarks file \"" << mstrLandmarksFile << "\" opened.");
-            // 预先读取前三行的注释
+            // 预先读取前三行注释
             std::string strDummy;
             getline(mifsLandMarks,strDummy);
             getline(mifsLandMarks,strDummy);
@@ -112,11 +123,26 @@ public:
             nId < mnMaxLandMarkId && ros::ok() && !gbQuit; // && /* YOUR CONDITION */
             ++nId)
         {
-            // TODO 
-            // <YOUR CODE>
+            //读取下一个导航目标点
+            ReadNextLandMark(dX, dY, dYawDeg);
+            //发布目标导航点
+            SetCurrGoal(dX, dY, dYawDeg);
+            mPubNextGoal.publish(mMsgCurrGoal);
+            ROS_INFO("Navigation Goal Is Published!");
 
-            // 使用这个实现延时2秒
-            // ros::Duration(2).sleep();
+            ros::Rate loop_rate(5);
+            // 回调函数未运行就一直等待，回调运行一次就继续
+            listen_goal++;
+            while(ros::ok() && listen_count<listen_goal)
+            {
+                ros::spinOnce();
+                loop_rate.sleep();
+                cout<<listen_count<<" "<<listen_goal<<endl;
+            }
+
+            cout<<"Please Wait For 2 Sec."<<endl;
+            //延时2秒
+            ros::Duration(2).sleep();
         }
 
         // TODO 
@@ -124,6 +150,18 @@ public:
     }
 
     // TODO 增加你的成员函数
+    //导航执行结果的回调函数
+    static void status_callback(const move_base_msgs::MoveBaseActionResult msg){	
+        if(msg.status.status == 3)
+        {
+            cout<<"Goal Was Achieved Successfully!"<<endl;
+        }
+        if(msg.status.status == 4)
+        {
+            cout<<"Goal Was Aborted!"<<endl;
+        }
+        listen_count++;
+    }
 
 private:
 
@@ -144,6 +182,8 @@ private:
         ros::Time timeStamp = ros::Time::now();
 
         // Step 1 初始化消息头
+        static int nCnt=0;
+        nCnt++;
         msgHeader.seq = nCnt;
         msgHeader.stamp = ros::Time::now();
         msgHeader.frame_id   = "map";
@@ -157,7 +197,10 @@ private:
         ROS_INFO_STREAM("Goal Id: " << ss.str());
 
         // TODO 设置坐标
-        // <YOUR CODE>
+        msgPt.x=dX;
+        msgPt.y=dY;
+        msgPt.z=0;
+        Heading2Quat(dYawDeg, msgQt);
         
     }
 
@@ -202,6 +245,8 @@ private:
         ss >> dX >> dY >> dYAW;
     }
 
+    
+
 private:
 
     ros::Publisher  mPubNextGoal;           ///< 发布器, 发布下一个路标点
@@ -211,7 +256,8 @@ private:
     std::string     mstrLandmarksFile;      ///< 外部路标点文件
     size_t          mnMaxLandMarkId;        ///< 外部路标点文件中的总点数
 
-    // TODO 补充你自己的成员变量(如果有的话)
+    move_base_msgs::MoveBaseActionGoal  mMsgCurrGoal; //导航目标点信息
+    
 };
 
 
