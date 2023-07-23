@@ -22,6 +22,7 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <geometry_msgs/Pose.h>
 // TODO 补充需要用到的头文件
+#include <tf/transform_listener.h>
 
 // OpenCV
 #include <opencv2/opencv.hpp>
@@ -49,10 +50,14 @@
 #define MACRO_SRC_RGB_IMG_INFO_TOPIC            "/camera/rgb/camera_info"
 #define MACRO_SRC_DEPTH_IMG_INFO_TOPIC          "/camera/depth/camera_info"
 
+//点云地图
+#define MACRO_SRC_CLOUDMAP_LOCAL_TOPIC          "/point_cloud_map/local_map"
+#define MACRO_SRC_CLOUDMAP_GLOBAL_TOPIC         "/point_cloud_map/global_map"
+
 // 坐标系名称
 // TODO 3.3.3
-// #define MACRO_CAMERA_OPTICAL_NAME            "_____"
-// #define MACRO_MAP_LINK_NAME                  "_____"
+#define MACRO_CAMERA_OPTICAL_NAME               "camera_depth_optical_frame"
+#define MACRO_MAP_LINK_NAME                     "map"
 
 // 判断全局地图需要更新的阈值
 #define CONST_DISTANCE_THRES_DEFAULT             0.2f
@@ -84,17 +89,21 @@ public:
         mupImgTrans.reset(new image_transport::ImageTransport(*mupNodeHandle));
 
         // Step 2 订阅彩色图像和深度图像, 注意队列长度为 1 最合适
-        // TODO 3.3.1
-        // mImgSubRGB = ______;
-        // mImgSubDepth = ____;
+        // 订阅彩色图像
+        mImgSubRGB = mupImgTrans->subscribe(MACRO_SRC_RGB_IMG_TOPIC, 1, 
+                            boost::bind(&PCMapNode::ImageRGBCallback, this, _1));
+        // 订阅深度图像
+        mImgSubDepth = mupImgTrans->subscribe(MACRO_SRC_DEPTH_IMG_TOPIC, 1, 
+                            boost::bind(&PCMapNode::ImageDepthCallback, this, _1));
 
         // Step 3 订阅深度相机内参
         // TODO 3.3.1
-        // mSubDepthCamInfo = ____;
+        mSubDepthCamInfo = mupNodeHandle->subscribe<sensor_msgs::CameraInfo>(MACRO_SRC_DEPTH_IMG_INFO_TOPIC, 1, 
+            boost::bind(&PCMapNode::DepthCamInfoCallBack, this, _1));
 
         // Step 4 设置局部点云(单帧点云)和全局点云发布器
-        // mPubLocalPCMap  = _______________;
-        // mPubGlobalPCMap = _______________;
+        mPubLocalPCMap  = mupNodeHandle->advertise<sensor_msgs::PointCloud2>(MACRO_SRC_CLOUDMAP_LOCAL_TOPIC , 10);
+        mPubGlobalPCMap = mupNodeHandle->advertise<sensor_msgs::PointCloud2>(MACRO_SRC_CLOUDMAP_GLOBAL_TOPIC , 10);
 
         // Step 5 生成 TF 坐标变换树监听器
         mupTFListener.reset(new tf::TransformListener());
@@ -138,7 +147,7 @@ public:
 
         // 初始化位姿状态
         GetCurrTransformInfo();
-        mLastTransform = mCurrTransform;
+        mLastTransform = mCurrTransform;// 更新
     }
 
     /** @brief 析构函数 */
@@ -164,8 +173,24 @@ public:
     {
         // TODO 3.3.1
         // Step 1 转换成为 cv::Mat 格式图像
+        cv::Mat imgRecv;
+        try
+        {
+            // 利用 cv_bridge 转换, OpenCV彩色图像格式为 BGR 通道顺序, 每通道8bit
+            imgRecv = cv_bridge::toCvShare(pMsg, "bgr8")->image;
+        }
+        catch (cv_bridge::Exception& e)
+        {
+            // 如果出现问题
+            ROS_ERROR("Could not convert from '%s' to 'bgr8'.", pMsg->encoding.c_str());
+        }
 
-        // Step 2 改变大小, 更新成员变量 
+        // Step 2 改变大小, 并更新 mimgScaledLastRGB
+        cv::resize(imgRecv, mimgScaledLastRGB, cv::Size(), 
+                    mfSCaleFactorInv, mfSCaleFactorInv);
+
+        // cv::imshow("RGB_IMG", mimgScaledLastRGB);
+        // cv::waitKey(5);
 
     }
 
@@ -181,12 +206,23 @@ public:
 
         // Step 2 获取深度图像
         // TODO 3.3.1
-        // YOUR CODE
+        cv::Mat imgRecv;
+        try
+        {
+            // 这里会自动重载
+            imgRecv= cv_bridge::toCvShare(pMsg)->image ; 
+        }
+        catch (cv_bridge::Exception& e)
+        {
+            ROS_ERROR("Could not convert depth image.");
+        }
 
         // 缩放图像, 并更新 mimgScaledLastDepth
-        // TODO 3.3.1 
-        cv::resize(____);
+        cv::resize(imgRecv, mimgScaledLastDepth, cv::Size(), 
+                    mfSCaleFactorInv, mfSCaleFactorInv);
 
+        // cv::imshow("Depth_Img", mimgScaledLastDepth);
+        // cv::waitKey(5);
 
         // Step 3 计算局部点云
         mnRows = mimgScaledLastDepth.rows;
@@ -221,8 +257,21 @@ public:
     {
         // 注意乘 mfSCaleFactorInv, 通过 topic 直接获取的是原始图像对应的相机参数, 我们需要计算等效的相机参数
         // TODO 3.3.1 处理相机内参, 实现
-        // mDepthCameraIntrinsic.fx = ....
-        // ...
+        mDepthCameraIntrinsic.fx = pMsg->K[0] * mfSCaleFactorInv;
+        mDepthCameraIntrinsic.fy = pMsg->K[4] * mfSCaleFactorInv;
+
+        mDepthCameraIntrinsic.cx = pMsg->K[2] * mfSCaleFactorInv;
+        mDepthCameraIntrinsic.cy = pMsg->K[5] * mfSCaleFactorInv;
+
+        mDepthCameraIntrinsic.isOK = true;
+
+        ROS_INFO_STREAM("Depth camera intrinsic: fx = " << mDepthCameraIntrinsic.fx <<
+                        ", fy = " << mDepthCameraIntrinsic.fy << 
+                        ", cx = " << mDepthCameraIntrinsic.cx << 
+                        ", cy = " << mDepthCameraIntrinsic.cy);
+
+        // 关闭订阅器
+        mSubDepthCamInfo.shutdown();
     }
 
     /** @brief 通过TF获取坐标变换 */
@@ -232,7 +281,7 @@ public:
         try
         {
             // TODO 3.3.3 获得两个坐标系之间转换的关系; 注意两个坐标系别写反了
-            // mupTFListener->lookupTransform(_______________);
+            mupTFListener->lookupTransform(MACRO_MAP_LINK_NAME, MACRO_CAMERA_OPTICAL_NAME, ros::Time(0), transform);
         }
         catch (tf::TransformException &ex) 
         {
@@ -267,7 +316,8 @@ public:
     void CreateLocalPointCloudMap(void)
     {
         // 清除局部点云
-        mLocalPCMap.clear();
+        //mLocalPCMap.clear();
+        mLocalPCMap.erase(mLocalPCMap.begin(),mLocalPCMap.end());
 
         // 遍历图像上的每一个点, 生成当前帧的点云数据
         for(size_t nIdY = 0; nIdY < mnRows; ++nIdY)
@@ -279,28 +329,38 @@ public:
                 if(std::isnan(z))  continue;
 
                 // TODO 3.3.2 计算空间点坐标
-                // float u = ____________;
-                // float v = ____________;
+                // float u = nIdX;
+                // float v = nIdY;
+                float u = float(nIdX);
+                float v = float(nIdY);
 
-                // float x = ____________;
-                // float y = ____________;
+                float x = (u-mDepthCameraIntrinsic.cx)*z/mDepthCameraIntrinsic.fx;
+                float y = (v-mDepthCameraIntrinsic.cy)*z/mDepthCameraIntrinsic.fy;
 
-                // b: color[0] g: color[1] r: color[2]
-                // cv::Vec3b color = mimgScaledLastRGB.at<cv::Vec3b>(____, ___);
-
+                cv::Vec3b color = mimgScaledLastRGB.at<cv::Vec3b>(nIdY, nIdX);
 
                 // TODO 3.3.2 新建点, 设置坐标和颜色, 并添加到局部点云地图中
                 pcl::PointXYZRGB pt;
-                // YOUR CODE
+                pt.x=x;
+                pt.y=y;
+                pt.z=z;
+                pt.b=color[0];
+                pt.g=color[1];
+                pt.r=color[2];
+
+                mLocalPCMap.push_back(pt);
+                
             }
         }
 
         // TODO 3.3.2 转换成为 ROS 的消息格式
-        // ____________________;
+        pcl::toROSMsg(mLocalPCMap,mMsgLocalPCMap);
         // NOTICE 注意这里的 MACRO_CAMERA_OPTICAL_NAME 需要自己设置
         mMsgLocalPCMap.header.frame_id = MACRO_CAMERA_OPTICAL_NAME;
+        mMsgLocalPCMap.header.stamp = ros::Time::now();
         // TODO 3.3.2 发布
-        // ________________;
+        mPubLocalPCMap.publish(mMsgLocalPCMap);
+
     }
 
     /**
@@ -323,6 +383,7 @@ public:
         if(bDistance || bANgle)
         {
             // 更新
+            ROS_INFO("Global Map Updated!");
             mLastTransform = mCurrTransform;
             // DEBUG
             ROS_DEBUG_STREAM("dAngleDeg = " << dAngleDeg << ", distance = " << Tcl.getOrigin().length() << ", Update global map!");
@@ -331,6 +392,7 @@ public:
         else
         {
             // 不满足
+            ROS_INFO("Global Map Need not to be Updated!");
             return false;
         }
     }
@@ -341,16 +403,25 @@ public:
         // Step 1 局部点云降采样, 滤波
         // TODO 3.3.4 注意相关参数 mfPCLeafSize mnPCMeanK mfPCFilterThres均已提供
         // YOUR CODE
+        pcl::PointCloud<pcl::PointXYZRGB>  tmpPCMapFiltered = mLocalPCMap;
 
         // Step 2 将点云中点的坐标转换到 map 坐标系下, 添加到全局点云中
         for(auto& oldPt: tmpPCMapFiltered)
         {
             // TODO 3.3.3 局部点云转换到 map 坐标系下
-            // tf::Vector3 tvBefore3d(oldPt.x, oldPt.y, oldPt.z);
-            // tf::Vector3 tvAfter3d = mCurrTransform * tvBefore3d;
-            // 访问元素: tvAfter3d.x() 
+            tf::Vector3 tvBefore3d(oldPt.x, oldPt.y, oldPt.z);
+            tf::Vector3 tvAfter3d = mCurrTransform * tvBefore3d;
 
             // TODO 3.3.3 将新点的坐标添加到全局点云中
+            pcl::PointXYZRGB pt;
+            pt.x=tvAfter3d.x();
+            pt.y=tvAfter3d.y();
+            pt.z=tvAfter3d.z();
+            pt.b=oldPt.b;
+            pt.g=oldPt.g;
+            pt.r=oldPt.r;
+
+            mGlobalPCMap.push_back(pt);
         }
 
         // Step 3 对全局点云进行降采样
@@ -359,7 +430,8 @@ public:
 
         // Step 4 发布全局点云地图
         pcl::toROSMsg(mGlobalPCMap, mMsgGlobalPCMap);
-        mMsgGlobalPCMap.header.frame_id = "map";
+        mMsgGlobalPCMap.header.frame_id = MACRO_MAP_LINK_NAME;
+        mMsgGlobalPCMap.header.stamp = ros::Time::now();
         // 发布
         mPubGlobalPCMap.publish(mMsgGlobalPCMap);
     }

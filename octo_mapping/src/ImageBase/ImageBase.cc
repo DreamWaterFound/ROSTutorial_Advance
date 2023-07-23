@@ -163,7 +163,6 @@ public:
     void ImageDepthCallback(const sensor_msgs::ImageConstPtr& pMsg)
     {
         cv::Mat imgRecv;
-        
         try
         {
             // 这里会自动重载
