@@ -32,6 +32,7 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/statistical_outlier_removal.h>
+#include <pcl/filters/radius_outlier_removal.h>
 
 // ROS节点基类
 #include "ExperNodeBase.hpp"
@@ -399,14 +400,28 @@ public:
 
     void UpdateGlobalPointCloudMap(void)
     {
-        
         // Step 1 局部点云降采样, 滤波
         // TODO 3.3.4 注意相关参数 mfPCLeafSize mnPCMeanK mfPCFilterThres均已提供
-        // YOUR CODE
-        pcl::PointCloud<pcl::PointXYZRGB>  tmpPCMapFiltered = mLocalPCMap;
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr tmpOriginPCMap = mLocalPCMap.makeShared();//获取局部点云信息
+        //体素网格滤波
+        pcl::PointCloud<pcl::PointXYZRGB> tmpDownSampedPCMap;
+        pcl::VoxelGrid<pcl::PointXYZRGB> downsample_filter;
+        downsample_filter.setLeafSize(mfPCLeafSize,mfPCLeafSize,mfPCLeafSize);//参数设置
+        downsample_filter.setDownsampleAllData(true);//对全字段进行下采样;
+        downsample_filter.setInputCloud(tmpOriginPCMap);//输入
+        downsample_filter.filter(tmpDownSampedPCMap);//输出
+
+        //统计滤波器
+        pcl::PointCloud<pcl::PointXYZRGB> tmpFilteredPCMap;
+        pcl::StatisticalOutlierRemoval<pcl::PointXYZRGB> Static;
+        Static.setInputCloud(tmpDownSampedPCMap.makeShared());//输入
+        Static.setMeanK(mnPCMeanK);//进行统计时考虑查询点临近点数
+        Static.setStddevMulThresh(mfPCFilterThres);//判断是否为离群点的阈值
+        Static.filter(tmpFilteredPCMap);//输出
+
 
         // Step 2 将点云中点的坐标转换到 map 坐标系下, 添加到全局点云中
-        for(auto& oldPt: tmpPCMapFiltered)
+        for(auto& oldPt: tmpFilteredPCMap)
         {
             // TODO 3.3.3 局部点云转换到 map 坐标系下
             tf::Vector3 tvBefore3d(oldPt.x, oldPt.y, oldPt.z);
@@ -421,12 +436,14 @@ public:
             pt.g=oldPt.g;
             pt.r=oldPt.r;
 
-            mGlobalPCMap.push_back(pt);
+            tmpGlobalPCMap.push_back(pt);
         }
 
         // Step 3 对全局点云进行降采样
-        // TODO 3.3.4
-       // YOUR CODE
+        downsample_filter.setLeafSize(mfPCLeafSize,mfPCLeafSize,mfPCLeafSize);//参数设置
+        downsample_filter.setDownsampleAllData(true);//对全字段进行下采样;
+        downsample_filter.setInputCloud(tmpGlobalPCMap.makeShared());//输入
+        downsample_filter.filter(mGlobalPCMap);//输出
 
         // Step 4 发布全局点云地图
         pcl::toROSMsg(mGlobalPCMap, mMsgGlobalPCMap);
@@ -453,6 +470,7 @@ private:
 
     pcl::PointCloud<pcl::PointXYZRGB>            mLocalPCMap;                   ///< 局部点云对象
     pcl::PointCloud<pcl::PointXYZRGB>            mGlobalPCMap;                  ///< 全局点云对象
+    pcl::PointCloud<pcl::PointXYZRGB>            tmpGlobalPCMap;                ///< 暂存未滤波的全局点云
 
     sensor_msgs::PointCloud2                     mMsgLocalPCMap;                ///< 局部点云消息
     sensor_msgs::PointCloud2                     mMsgGlobalPCMap;               ///< 全局点云消息
