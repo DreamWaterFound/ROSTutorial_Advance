@@ -21,16 +21,19 @@
 
   <!-- TODO 3.3.5 补充启动 rviz 的标签, 注意使用我们自己保存的 rviz 配置文件 -->
   <group if="$(arg open_rviz)"> 
-    <!-- YOUR CODE -->
+    <node pkg="rviz" type="rviz" name="rviz" required="true"
+	    args="-d $(find octo_mapping)/rviz/point_cloud_mapping.rviz"/>
   </group>
 
   <!-- 启动 point_cloud_map 节点的标签, 同时完成参数服务器的设置 -->
-  <!-- <node ....... output="screen"> -->
-    <!-- <param name="XXXXX"    value="XXXX"   /> -->
-    <!-- ... -->
-    <!-- YOUR CODE -->
-    
-
-  <!-- </node> -->
+  <node pkg="octo_mapping" type="point_cloud_map" name="point_cloud_map" output="screen">
+         <param name="/scale_factor_inv"          value="0.25"/>
+         <param name="/update_frequency"          value="1.00"/>
+         <param name="/distance_threshold"        value="0.20"/>
+         <param name="/angle_deg_threshold"       value="10.0"/>
+         <param name="/point_cloud_leaf_size"     value="0.05"/>
+         <param name="/point_cloud_mean_K"        value="10"/>
+         <param name="/point_cloud_filter_thres"  value="0.2"/>
+    </node>
 
 </launch>

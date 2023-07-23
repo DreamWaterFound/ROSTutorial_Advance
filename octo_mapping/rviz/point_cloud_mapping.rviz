@@ -217,7 +217,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.05000000074505806
       Style: Flat Squares
-      Topic: /point_cloud_map/global_map
+      Topic: /point_cloud_map/local_map
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -250,7 +250,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/XYOrbit
-      Distance: 20.655715942382812
+      Distance: 10.900680541992188
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -258,8 +258,8 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: -2.7736544609069824
-        Y: 3.542487144470215
+        X: -3.339524269104004
+        Y: 2.2855405807495117
         Z: 3.0994415283203125e-06
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
