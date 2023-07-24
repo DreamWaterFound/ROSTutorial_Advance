@@ -350,7 +350,6 @@ public:
                 pt.r=color[2];
 
                 mLocalPCMap.push_back(pt);
-                
             }
         }
 
