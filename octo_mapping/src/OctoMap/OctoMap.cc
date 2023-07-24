@@ -87,7 +87,7 @@ public:
         ROS_DEBUG("Global Map Get!");
 
         // Step 1 点云消息转换成为 PCL 格式
-        pcl::PointCloud<pcl::PointXYZRGB>       cloud;
+        pcl::PointCloud<pcl::PointXYZRGB>    cloud;
         pcl::fromROSMsg(*msgPCL,cloud);
     
         // Step 2 清除八叉树地图
